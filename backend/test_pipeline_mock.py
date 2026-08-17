@@ -9,6 +9,10 @@ from app.models.evidence import (
     ProfileEvidence,
     SystemProfileExtraction,
 )
+from app.models.extracted_document import (
+    DocumentSection,
+    ExtractedDocument,
+)
 from app.models.report import (
     ComplianceReport,
     ReportSummary,
@@ -49,7 +53,7 @@ try:
         ProfileEvidence(
             field="human_oversight",
             value="Human review",
-            page_number=4,
+            page_number=1,
             quote="HR reviews recommendations.",
         )
     ]
@@ -58,8 +62,12 @@ try:
         category=RiskCategory.high_risk,
         ai_act_applicable=True,
         explanation="Recruitment use.",
-        relevant_articles=["Article 6"],
-        relevant_annexes=["Annex III"],
+        relevant_articles=[
+            "Article 6"
+        ],
+        relevant_annexes=[
+            "Annex III"
+        ],
         confidence=0.9,
     )
 
@@ -99,47 +107,80 @@ try:
         assessments=[],
     )
 
+    extracted_document = ExtractedDocument(
+        filename="test_system.txt",
+        file_type="txt",
+        text="AI recruitment system",
+        sections=[
+            DocumentSection(
+                section_number=1,
+                text="AI recruitment system",
+            )
+        ],
+        page_count=None,
+    )
+
     # ----------------------------------------------
-    # Mock external/expensive services
+    # Mock document extraction
     # ----------------------------------------------
 
-    service.profile_service.extract_profile = MagicMock(
-        return_value=SystemProfileExtraction(
-            profile=profile,
-            evidence=evidence,
+    service.document_extraction_service.extract = (
+        MagicMock(
+            return_value=extracted_document
         )
     )
 
-    service.analysis_service.analyze = MagicMock(
-        return_value=analysis
+    # ----------------------------------------------
+    # Mock profile extraction
+    # ----------------------------------------------
+
+    service.profile_service.extract_profile = (
+        MagicMock(
+            return_value=SystemProfileExtraction(
+                profile=profile,
+                evidence=evidence,
+            )
+        )
     )
 
-    service.report_service.generate_report = MagicMock(
-        return_value=report
+    # ----------------------------------------------
+    # Mock compliance analysis
+    # ----------------------------------------------
+
+    service.analysis_service.analyze = (
+        MagicMock(
+            return_value=analysis
+        )
     )
 
-    # Mock PDF extraction too
-    from app.services.pdf_service import PDFService
+    # ----------------------------------------------
+    # Mock report generation
+    # ----------------------------------------------
 
-    original_extract = PDFService.extract_text
-
-    PDFService.extract_text = MagicMock(
-        return_value={
-            "filename": "test.pdf",
-            "page_count": 5,
-            "text": "AI recruitment system",
-            "pages": [
-                {
-                    "page_number": 1,
-                    "text": "AI recruitment system",
-                }
-            ],
-        }
+    service.report_service.generate_report = (
+        MagicMock(
+            return_value=report
+        )
     )
 
-    result = service.analyze_pdf(
+    result = service.analyze_document(
         db=db,
-        file_path="fake.pdf",
+        file_path="fake.txt",
+    )
+
+    print(
+        "Filename:",
+        result["filename"],
+    )
+
+    print(
+        "File type:",
+        result["file_type"],
+    )
+
+    print(
+        "Section count:",
+        result["section_count"],
     )
 
     print(
@@ -163,8 +204,23 @@ try:
     )
 
     print(
+        "Document extraction calls:",
+        (
+            service
+            .document_extraction_service
+            .extract
+            .call_count
+        ),
+    )
+
+    print(
         "Profile extraction calls:",
-        service.profile_service.extract_profile.call_count,
+        (
+            service
+            .profile_service
+            .extract_profile
+            .call_count
+        ),
     )
 
     print(
@@ -174,10 +230,13 @@ try:
 
     print(
         "Report calls:",
-        service.report_service.generate_report.call_count,
+        (
+            service
+            .report_service
+            .generate_report
+            .call_count
+        ),
     )
-
-    PDFService.extract_text = original_extract
 
 finally:
     db.close()

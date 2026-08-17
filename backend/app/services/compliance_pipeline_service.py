@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Session
 
-from app.models.report import ComplianceReport
-from app.models.system_profile import SystemProfile
+from app.services.document_extraction_service import (
+    DocumentExtractionService,
+)
 from app.services.full_analysis_service import FullAnalysisService
-from app.services.pdf_service import PDFService
 from app.services.report_service import ReportService
 from app.services.system_profile_service import SystemProfileService
 
@@ -11,39 +11,60 @@ from app.services.system_profile_service import SystemProfileService
 class CompliancePipelineService:
 
     def __init__(self):
+        self.document_extraction_service = (
+            DocumentExtractionService()
+        )
+
         self.profile_service = SystemProfileService()
         self.analysis_service = FullAnalysisService()
         self.report_service = ReportService()
 
-    def analyze_pdf(
+    def analyze_document(
         self,
         db: Session,
         file_path: str,
     ) -> dict:
 
         # ----------------------------------------------
-        # 1. Extract PDF
+        # 1. Extract document
         # ----------------------------------------------
 
-        document = PDFService.extract_text(
-            file_path
+        document = (
+            self.document_extraction_service.extract(
+                file_path=file_path
+            )
         )
 
-        if not document["text"].strip():
+        if not document.text.strip():
             raise ValueError(
-                "No readable text was found in the PDF."
+                "No readable text was found in the document."
             )
 
         # ----------------------------------------------
-        # 2. Extract SystemProfile + evidence
+        # 2. Convert normalized sections into the
+        #    structure expected by SystemProfileService
         # ----------------------------------------------
 
-        extraction = self.profile_service.extract_profile(
-            pages=document["pages"]
+        sections = [
+            {
+                "page_number": section.section_number,
+                "text": section.text,
+            }
+            for section in document.sections
+        ]
+
+        # ----------------------------------------------
+        # 3. Extract SystemProfile + evidence
+        # ----------------------------------------------
+
+        extraction = (
+            self.profile_service.extract_profile(
+                pages=sections
+            )
         )
 
         # ----------------------------------------------
-        # 3. Run risk-aware compliance analysis
+        # 4. Run risk-aware compliance analysis
         # ----------------------------------------------
 
         analysis = self.analysis_service.analyze(
@@ -53,7 +74,7 @@ class CompliancePipelineService:
         )
 
         # ----------------------------------------------
-        # 4. Generate final report
+        # 5. Generate final report
         # ----------------------------------------------
 
         report = self.report_service.generate_report(
@@ -62,11 +83,14 @@ class CompliancePipelineService:
         )
 
         # ----------------------------------------------
-        # 5. Return structured pipeline result
+        # 6. Return normalized pipeline result
         # ----------------------------------------------
 
         return {
-            "page_count": document["page_count"],
+            "filename": document.filename,
+            "file_type": document.file_type,
+            "page_count": document.page_count,
+            "section_count": len(document.sections),
             "system_profile": extraction.profile,
             "user_evidence": extraction.evidence,
             "report": report,

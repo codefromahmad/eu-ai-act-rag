@@ -14,7 +14,12 @@ from app.exceptions.llm_exceptions import (
 from app.services.compliance_pipeline_service import (
     CompliancePipelineService,
 )
-from app.services.pdf_service import PDFService
+from app.services.document_extraction_service import (
+    DocumentExtractionService,
+)
+from app.services.file_validation_service import (
+    FileValidationService,
+)
 from app.services.system_profile_service import (
     SystemProfileService,
 )
@@ -26,17 +31,17 @@ router = APIRouter(
 )
 
 
-def validate_pdf(file: UploadFile) -> None:
-    if file.content_type != "application/pdf":
-        raise HTTPException(
-            status_code=400,
-            detail="Only PDF files are supported.",
-        )
+file_validation_service = FileValidationService()
 
 
-def handle_llm_exception(exc: Exception) -> None:
+def handle_llm_exception(
+    exc: Exception,
+) -> None:
 
-    if isinstance(exc, LLMQuotaExceededError):
+    if isinstance(
+        exc,
+        LLMQuotaExceededError,
+    ):
         raise HTTPException(
             status_code=503,
             detail=(
@@ -45,7 +50,10 @@ def handle_llm_exception(exc: Exception) -> None:
             ),
         )
 
-    if isinstance(exc, LLMRateLimitError):
+    if isinstance(
+        exc,
+        LLMRateLimitError,
+    ):
         raise HTTPException(
             status_code=429,
             detail=(
@@ -54,7 +62,10 @@ def handle_llm_exception(exc: Exception) -> None:
             ),
         )
 
-    if isinstance(exc, LLMResponseError):
+    if isinstance(
+        exc,
+        LLMResponseError,
+    ):
         raise HTTPException(
             status_code=502,
             detail=(
@@ -62,7 +73,10 @@ def handle_llm_exception(exc: Exception) -> None:
             ),
         )
 
-    if isinstance(exc, LLMServiceError):
+    if isinstance(
+        exc,
+        LLMServiceError,
+    ):
         raise HTTPException(
             status_code=502,
             detail=(
@@ -71,104 +85,171 @@ def handle_llm_exception(exc: Exception) -> None:
         )
 
 
+def save_upload_to_temp(
+    file: UploadFile,
+    extension: str,
+) -> str:
+
+    with NamedTemporaryFile(
+        suffix=extension,
+        delete=False,
+    ) as temp_file:
+
+        shutil.copyfileobj(
+            file.file,
+            temp_file,
+        )
+
+        return temp_file.name
+
+
 @router.post("/extract")
-async def extract_pdf(
+async def extract_document(
     file: UploadFile = File(...)
 ):
 
-    validate_pdf(file)
+    extension = file_validation_service.validate(
+        file
+    )
+
+    await file_validation_service.validate_size(
+        file
+    )
 
     temp_path = None
 
     try:
-        with NamedTemporaryFile(
-            suffix=".pdf",
-            delete=False,
-        ) as temp_file:
-
-            shutil.copyfileobj(
-                file.file,
-                temp_file,
-            )
-
-            temp_path = temp_file.name
-
-        result = PDFService.extract_text(
-            temp_path
+        temp_path = save_upload_to_temp(
+            file=file,
+            extension=extension,
         )
 
-        if not result["text"].strip():
+        extraction_service = (
+            DocumentExtractionService()
+        )
+
+        document = extraction_service.extract(
+            file_path=temp_path
+        )
+
+        if not document.text.strip():
             raise HTTPException(
                 status_code=400,
-                detail="No readable text was found in the PDF.",
+                detail=(
+                    "No readable text was found "
+                    "in the document."
+                ),
             )
 
         return {
             "filename": file.filename,
-            "page_count": result["page_count"],
-            "text": result["text"],
-            "pages": result["pages"],
+            "file_type": document.file_type,
+            "page_count": document.page_count,
+            "section_count": len(
+                document.sections
+            ),
+            "text": document.text,
+            "sections": [
+                section.model_dump()
+                for section in document.sections
+            ],
         }
 
     except HTTPException:
         raise
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
     except Exception:
         raise HTTPException(
             status_code=500,
-            detail="Failed to extract the PDF.",
+            detail=(
+                "Failed to extract the document."
+            ),
         )
 
     finally:
         if temp_path:
-            Path(temp_path).unlink(
+            Path(
+                temp_path
+            ).unlink(
                 missing_ok=True
             )
 
 
 @router.post("/analyze")
-async def analyze_pdf(
+async def analyze_document(
     file: UploadFile = File(...)
 ):
 
-    validate_pdf(file)
+    extension = file_validation_service.validate(
+        file
+    )
+
+    await file_validation_service.validate_size(
+        file
+    )
 
     temp_path = None
 
     try:
-        with NamedTemporaryFile(
-            suffix=".pdf",
-            delete=False,
-        ) as temp_file:
-
-            shutil.copyfileobj(
-                file.file,
-                temp_file,
-            )
-
-            temp_path = temp_file.name
-
-        document = PDFService.extract_text(
-            temp_path
+        temp_path = save_upload_to_temp(
+            file=file,
+            extension=extension,
         )
 
-        if not document["text"].strip():
+        extraction_service = (
+            DocumentExtractionService()
+        )
+
+        document = extraction_service.extract(
+            file_path=temp_path
+        )
+
+        if not document.text.strip():
             raise HTTPException(
                 status_code=400,
-                detail="No readable text was found in the PDF.",
+                detail=(
+                    "No readable text was found "
+                    "in the document."
+                ),
             )
 
-        profile_service = SystemProfileService()
+        sections = [
+            {
+                "page_number": (
+                    section.section_number
+                ),
+                "text": section.text,
+            }
+            for section in document.sections
+        ]
 
-        extraction = profile_service.extract_profile(
-            pages=document["pages"]
+        profile_service = (
+            SystemProfileService()
+        )
+
+        extraction = (
+            profile_service.extract_profile(
+                pages=sections
+            )
         )
 
         return {
             "filename": file.filename,
-            "page_count": document["page_count"],
+            "file_type": document.file_type,
+            "page_count": document.page_count,
+            "section_count": len(
+                document.sections
+            ),
             "system_profile": (
-                extraction.profile.model_dump()
+                extraction
+                .profile
+                .model_dump()
             ),
             "evidence": [
                 item.model_dump()
@@ -179,26 +260,36 @@ async def analyze_pdf(
     except HTTPException:
         raise
 
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
+
     except (
         LLMQuotaExceededError,
         LLMRateLimitError,
         LLMResponseError,
         LLMServiceError,
     ) as exc:
-        handle_llm_exception(exc)
+        handle_llm_exception(
+            exc
+        )
 
     except Exception:
         raise HTTPException(
             status_code=500,
             detail=(
                 "An unexpected error occurred "
-                "while analyzing the PDF."
+                "while analyzing the document."
             ),
         )
 
     finally:
         if temp_path:
-            Path(temp_path).unlink(
+            Path(
+                temp_path
+            ).unlink(
                 missing_ok=True
             )
 
@@ -208,46 +299,63 @@ async def generate_compliance_report(
     file: UploadFile = File(...)
 ):
 
-    validate_pdf(file)
+    extension = file_validation_service.validate(
+        file
+    )
+
+    await file_validation_service.validate_size(
+        file
+    )
 
     temp_path = None
     db = None
 
     try:
-        with NamedTemporaryFile(
-            suffix=".pdf",
-            delete=False,
-        ) as temp_file:
-
-            shutil.copyfileobj(
-                file.file,
-                temp_file,
-            )
-
-            temp_path = temp_file.name
+        temp_path = save_upload_to_temp(
+            file=file,
+            extension=extension,
+        )
 
         db = SessionLocal()
 
-        pipeline = CompliancePipelineService()
+        pipeline = (
+            CompliancePipelineService()
+        )
 
-        result = pipeline.analyze_pdf(
-            db=db,
-            file_path=temp_path,
+        result = (
+            pipeline.analyze_document(
+                db=db,
+                file_path=temp_path,
+            )
         )
 
         return {
             "filename": file.filename,
-            "page_count": result["page_count"],
+            "file_type": result[
+                "file_type"
+            ],
+            "page_count": result[
+                "page_count"
+            ],
+            "section_count": result[
+                "section_count"
+            ],
             "system_profile": (
-                result["system_profile"].model_dump()
+                result[
+                    "system_profile"
+                ].model_dump()
             ),
             "user_evidence": [
                 evidence.model_dump()
                 for evidence
-                in result["user_evidence"]
+                in result[
+                    "user_evidence"
+                ]
             ],
             "report": (
-                result["report"].model_dump()
+                result[
+                    "report"
+                ].model_dump()
             ),
         }
 
@@ -266,7 +374,9 @@ async def generate_compliance_report(
         LLMResponseError,
         LLMServiceError,
     ) as exc:
-        handle_llm_exception(exc)
+        handle_llm_exception(
+            exc
+        )
 
     except Exception:
         raise HTTPException(
@@ -282,6 +392,8 @@ async def generate_compliance_report(
             db.close()
 
         if temp_path:
-            Path(temp_path).unlink(
+            Path(
+                temp_path
+            ).unlink(
                 missing_ok=True
             )
