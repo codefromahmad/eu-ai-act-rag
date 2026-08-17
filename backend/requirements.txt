@@ -11,3 +11,5 @@ pgvector
 sentence-transformers
 pymupdf
 python-docx
+pytest
+pytest-asyncio
