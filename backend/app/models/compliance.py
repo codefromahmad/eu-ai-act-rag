@@ -18,6 +18,8 @@ class LegalReference(BaseModel):
 class ComplianceRequirement(BaseModel):
     requirement_id: str
 
+    primary_article: str
+
     title: str
 
     description: str

@@ -19,9 +19,9 @@ try:
         )
         print("=" * 70)
 
-        references = service.retrieve_legal_references(
+        references = service.retrieve_for_requirement(
             db=db,
-            query=requirement.query,
+            requirement=requirement,
             limit=3,
         )
 

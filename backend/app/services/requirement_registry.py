@@ -9,6 +9,7 @@ REQUIREMENTS = [
             "The AI system should implement an appropriate "
             "risk management process."
         ),
+        primary_article="Article 9",
         query="risk management system requirements for high-risk AI systems",
     ),
 
@@ -19,6 +20,7 @@ REQUIREMENTS = [
             "Training, validation and testing data should meet "
             "appropriate data governance and quality requirements."
         ),
+        primary_article="Article 10",
         query="training validation testing data governance requirements",
     ),
 
@@ -28,6 +30,7 @@ REQUIREMENTS = [
         description=(
             "The system should have sufficient technical documentation."
         ),
+        primary_article="Article 11",
         query="technical documentation requirements for high-risk AI systems",
     ),
 
@@ -38,6 +41,7 @@ REQUIREMENTS = [
             "The system should support appropriate logging "
             "and record keeping."
         ),
+        primary_article="Article 12",
         query="automatic logging and record keeping requirements",
     ),
 
@@ -48,6 +52,7 @@ REQUIREMENTS = [
             "Deployers should receive sufficient information "
             "to understand and use the system appropriately."
         ),
+        primary_article="Article 13",
         query="transparency and information requirements for deployers",
     ),
 
@@ -57,6 +62,7 @@ REQUIREMENTS = [
         description=(
             "The system should support effective human oversight."
         ),
+        primary_article="Article 14",
         query="human oversight requirements for high-risk AI systems",
     ),
 
@@ -67,6 +73,7 @@ REQUIREMENTS = [
             "The system should provide appropriate levels of "
             "accuracy, robustness and cybersecurity."
         ),
+        primary_article="Article 15",
         query="accuracy robustness cybersecurity requirements",
     ),
 ]
