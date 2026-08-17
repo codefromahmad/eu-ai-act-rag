@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 
 from app.models.compliance import ComplianceAssessment
+from app.models.risk_classification import RiskClassification
 
 
 class AnalysisScore(BaseModel):
@@ -15,5 +16,6 @@ class AnalysisScore(BaseModel):
 
 
 class FullComplianceAnalysis(BaseModel):
+    risk_classification: RiskClassification
     assessments: list[ComplianceAssessment]
     score: AnalysisScore
