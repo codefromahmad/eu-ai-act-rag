@@ -1,0 +1,26 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environment
+.venv/
+backend/.venv/
+
+# Environment variables / secrets
+.env
+backend/.env
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/
+
+# Local project data
+backend/data/
+
+# Python caches
+.pytest_cache/
+.mypy_cache/
