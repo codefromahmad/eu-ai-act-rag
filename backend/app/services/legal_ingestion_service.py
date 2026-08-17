@@ -11,6 +11,11 @@ class LegalIngestionService:
         re.IGNORECASE | re.MULTILINE,
     )
 
+    ANNEX_PATTERN = re.compile(
+        r"^\s*ANNEX\s+([IVXLCDM]+)\s*$",
+        re.MULTILINE,
+    )
+
     @classmethod
     def split_articles(
         cls,
@@ -45,6 +50,47 @@ class LegalIngestionService:
                     document=document_name,
                     article=f"Article {article_number}",
                     text=article_text,
+                    source=source,
+                    version=version,
+                )
+            )
+
+        return chunks
+
+    @classmethod
+    def split_annexes(
+        cls,
+        text: str,
+        document_name: str,
+        source: str | None = None,
+        version: str | None = None,
+    ) -> list[LegalChunk]:
+
+        matches = list(
+            cls.ANNEX_PATTERN.finditer(text)
+        )
+
+        chunks: list[LegalChunk] = []
+
+        for index, match in enumerate(matches):
+
+            start = match.start()
+
+            if index + 1 < len(matches):
+                end = matches[index + 1].start()
+            else:
+                end = len(text)
+
+            annex_text = text[start:end].strip()
+
+            annex_number = match.group(1)
+
+            chunks.append(
+                LegalChunk(
+                    chunk_id=str(uuid.uuid4()),
+                    document=document_name,
+                    annex=f"Annex {annex_number}",
+                    text=annex_text,
                     source=source,
                     version=version,
                 )

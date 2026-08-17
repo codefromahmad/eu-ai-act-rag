@@ -24,26 +24,53 @@ class LegalDocumentService:
         version: str | None = None,
     ):
 
+        # 1. Extract PDF text
         document = PDFService.extract_text(
             file_path
         )
 
-        chunks = LegalIngestionService.split_articles(
-            text=document["text"],
-            document_name=document_name,
-            source=source,
-            version=version,
+        # 2. Parse Articles
+        article_chunks = (
+            LegalIngestionService.split_articles(
+                text=document["text"],
+                document_name=document_name,
+                source=source,
+                version=version,
+            )
         )
 
+        # 3. Parse Annexes
+        annex_chunks = (
+            LegalIngestionService.split_annexes(
+                text=document["text"],
+                document_name=document_name,
+                source=source,
+                version=version,
+            )
+        )
+
+        # 4. Combine both legal structures
+        chunks = (
+            article_chunks
+            + annex_chunks
+        )
+
+        # 5. Generate embeddings
         embeddings = []
 
         for chunk in chunks:
-            embedding = self.embedding_service.embed_text(
-                chunk.text
+
+            embedding = (
+                self.embedding_service.embed_text(
+                    chunk.text
+                )
             )
 
-            embeddings.append(embedding)
+            embeddings.append(
+                embedding
+            )
 
+        # 6. Store everything in PostgreSQL
         LegalChunkRepository.save_many(
             db=db,
             chunks=chunks,
