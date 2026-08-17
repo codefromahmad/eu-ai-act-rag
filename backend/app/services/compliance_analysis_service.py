@@ -1,5 +1,7 @@
 import json
 
+from sqlalchemy.orm import Session
+
 from app.models.compliance import (
     ComplianceAssessment,
     ComplianceRequirement,
@@ -8,12 +10,16 @@ from app.models.compliance import (
 from app.models.evidence import ProfileEvidence
 from app.models.system_profile import SystemProfile
 from app.services.llm_service import LLMService
+from app.services.requirement_retrieval_service import (
+    RequirementRetrievalService,
+)
 
 
 class ComplianceAnalysisService:
 
     def __init__(self):
         self.llm = LLMService()
+        self.requirement_retrieval = RequirementRetrievalService()
 
     def assess_requirement(
         self,
@@ -87,8 +93,50 @@ Your response must match this JSON schema:
 
         assessment = ComplianceAssessment.model_validate(data)
 
-        # Never trust the LLM to reproduce legal text.
-        # Attach the original retrieved references directly.
+        # Always attach the original legal text retrieved
+        # from our database instead of trusting the LLM
+        # to reproduce legal text.
         assessment.legal_references = legal_references
 
         return assessment
+
+    def assess_all_requirements(
+        self,
+        db: Session,
+        profile: SystemProfile,
+        user_evidence: list[ProfileEvidence],
+        requirements: list[ComplianceRequirement],
+    ) -> list[ComplianceAssessment]:
+
+        assessments: list[ComplianceAssessment] = []
+
+        for requirement in requirements:
+
+            print(
+                f"Analyzing {requirement.requirement_id} "
+                f"- {requirement.title}..."
+            )
+
+            legal_references = (
+                self.requirement_retrieval.retrieve_for_requirement(
+                    db=db,
+                    requirement=requirement,
+                    limit=2,
+                )
+            )
+
+            assessment = self.assess_requirement(
+                profile=profile,
+                user_evidence=user_evidence,
+                requirement=requirement,
+                legal_references=legal_references,
+            )
+
+            assessments.append(assessment)
+
+            print(
+                f"Completed {requirement.requirement_id}: "
+                f"{assessment.status.value}"
+            )
+
+        return assessments
