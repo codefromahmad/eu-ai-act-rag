@@ -11,10 +11,13 @@ from app.exceptions.llm_exceptions import (
     LLMResponseError,
     LLMServiceError,
 )
-from app.services.full_analysis_service import FullAnalysisService
+from app.services.compliance_pipeline_service import (
+    CompliancePipelineService,
+)
 from app.services.pdf_service import PDFService
-from app.services.report_service import ReportService
-from app.services.system_profile_service import SystemProfileService
+from app.services.system_profile_service import (
+    SystemProfileService,
+)
 
 
 router = APIRouter(
@@ -24,10 +27,6 @@ router = APIRouter(
 
 
 def validate_pdf(file: UploadFile) -> None:
-    """
-    Validate that the uploaded file is a PDF.
-    """
-
     if file.content_type != "application/pdf":
         raise HTTPException(
             status_code=400,
@@ -36,9 +35,6 @@ def validate_pdf(file: UploadFile) -> None:
 
 
 def handle_llm_exception(exc: Exception) -> None:
-    """
-    Convert internal LLM exceptions into clean API responses.
-    """
 
     if isinstance(exc, LLMQuotaExceededError):
         raise HTTPException(
@@ -79,9 +75,6 @@ def handle_llm_exception(exc: Exception) -> None:
 async def extract_pdf(
     file: UploadFile = File(...)
 ):
-    """
-    Extract raw text and page-level content from a PDF.
-    """
 
     validate_pdf(file)
 
@@ -107,10 +100,7 @@ async def extract_pdf(
         if not result["text"].strip():
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "No readable text was found "
-                    "in the PDF."
-                ),
+                detail="No readable text was found in the PDF.",
             )
 
         return {
@@ -140,10 +130,6 @@ async def extract_pdf(
 async def analyze_pdf(
     file: UploadFile = File(...)
 ):
-    """
-    Extract a structured AI-system profile and evidence
-    from an uploaded PDF.
-    """
 
     validate_pdf(file)
 
@@ -169,10 +155,7 @@ async def analyze_pdf(
         if not document["text"].strip():
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "No readable text was found "
-                    "in the PDF."
-                ),
+                detail="No readable text was found in the PDF.",
             )
 
         profile_service = SystemProfileService()
@@ -224,17 +207,6 @@ async def analyze_pdf(
 async def generate_compliance_report(
     file: UploadFile = File(...)
 ):
-    """
-    Run the complete EU AI Act analysis pipeline.
-
-    PDF
-    → SystemProfile
-    → Evidence
-    → Risk classification
-    → Requirement assessment
-    → Scoring
-    → Final report
-    """
 
     validate_pdf(file)
 
@@ -242,10 +214,6 @@ async def generate_compliance_report(
     db = None
 
     try:
-        # ----------------------------------------------
-        # 1. Save uploaded PDF temporarily
-        # ----------------------------------------------
-
         with NamedTemporaryFile(
             suffix=".pdf",
             delete=False,
@@ -258,82 +226,39 @@ async def generate_compliance_report(
 
             temp_path = temp_file.name
 
-        # ----------------------------------------------
-        # 2. Extract PDF text
-        # ----------------------------------------------
-
-        document = PDFService.extract_text(
-            temp_path
-        )
-
-        if not document["text"].strip():
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "No readable text was found "
-                    "in the PDF."
-                ),
-            )
-
-        # ----------------------------------------------
-        # 3. Extract SystemProfile + evidence
-        # ----------------------------------------------
-
-        profile_service = SystemProfileService()
-
-        extraction = profile_service.extract_profile(
-            pages=document["pages"]
-        )
-
-        # ----------------------------------------------
-        # 4. Open database
-        # ----------------------------------------------
-
         db = SessionLocal()
 
-        # ----------------------------------------------
-        # 5. Run risk-aware compliance analysis
-        # ----------------------------------------------
+        pipeline = CompliancePipelineService()
 
-        full_analysis_service = FullAnalysisService()
-
-        analysis = full_analysis_service.analyze(
+        result = pipeline.analyze_pdf(
             db=db,
-            profile=extraction.profile,
-            user_evidence=extraction.evidence,
+            file_path=temp_path,
         )
-
-        # ----------------------------------------------
-        # 6. Generate final report
-        # ----------------------------------------------
-
-        report_service = ReportService()
-
-        report = report_service.generate_report(
-            profile=extraction.profile,
-            analysis=analysis,
-        )
-
-        # ----------------------------------------------
-        # 7. Return complete response
-        # ----------------------------------------------
 
         return {
             "filename": file.filename,
-            "page_count": document["page_count"],
+            "page_count": result["page_count"],
             "system_profile": (
-                extraction.profile.model_dump()
+                result["system_profile"].model_dump()
             ),
             "user_evidence": [
                 evidence.model_dump()
                 for evidence
-                in extraction.evidence
+                in result["user_evidence"]
             ],
-            "report": report.model_dump(),
+            "report": (
+                result["report"].model_dump()
+            ),
         }
 
     except HTTPException:
         raise
+
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=400,
+            detail=str(exc),
+        )
 
     except (
         LLMQuotaExceededError,
