@@ -1,5 +1,8 @@
 from sqlalchemy.orm import Session
 
+from app.repositories.analysis_repository import (
+    AnalysisRepository,
+)
 from app.services.document_extraction_service import (
     DocumentExtractionService,
 )
@@ -23,6 +26,7 @@ class CompliancePipelineService:
         self,
         db: Session,
         file_path: str,
+        original_filename: str | None = None,
     ) -> dict:
 
         # ----------------------------------------------
@@ -41,8 +45,7 @@ class CompliancePipelineService:
             )
 
         # ----------------------------------------------
-        # 2. Convert normalized sections into the
-        #    structure expected by SystemProfileService
+        # 2. Convert sections into profile input
         # ----------------------------------------------
 
         sections = [
@@ -64,7 +67,7 @@ class CompliancePipelineService:
         )
 
         # ----------------------------------------------
-        # 4. Run risk-aware compliance analysis
+        # 4. Run compliance analysis
         # ----------------------------------------------
 
         analysis = self.analysis_service.analyze(
@@ -83,11 +86,30 @@ class CompliancePipelineService:
         )
 
         # ----------------------------------------------
-        # 6. Return normalized pipeline result
+        # 6. Persist completed analysis
+        # ----------------------------------------------
+
+        saved_analysis = AnalysisRepository.save(
+            db=db,
+            filename=(
+                original_filename
+                or document.filename
+            ),
+            file_type=document.file_type,
+            profile=extraction.profile,
+            report=report,
+        )
+
+        # ----------------------------------------------
+        # 7. Return result
         # ----------------------------------------------
 
         return {
-            "filename": document.filename,
+            "analysis_id": saved_analysis.analysis_id,
+            "filename": (
+                original_filename
+                or document.filename
+            ),
             "file_type": document.file_type,
             "page_count": document.page_count,
             "section_count": len(document.sections),

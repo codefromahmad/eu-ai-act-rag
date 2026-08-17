@@ -326,11 +326,17 @@ async def generate_compliance_report(
             pipeline.analyze_document(
                 db=db,
                 file_path=temp_path,
+                original_filename=file.filename,
             )
         )
 
         return {
-            "filename": file.filename,
+            "analysis_id": result[
+                "analysis_id"
+            ],
+            "filename": result[
+                "filename"
+            ],
             "file_type": result[
                 "file_type"
             ],
