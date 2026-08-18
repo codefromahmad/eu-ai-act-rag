@@ -29,10 +29,6 @@ class CompliancePipelineService:
         original_filename: str | None = None,
     ) -> dict:
 
-        # ----------------------------------------------
-        # 1. Extract document
-        # ----------------------------------------------
-
         document = (
             self.document_extraction_service.extract(
                 file_path=file_path
@@ -44,21 +40,18 @@ class CompliancePipelineService:
                 "No readable text was found in the document."
             )
 
-        # ----------------------------------------------
-        # 2. Convert sections into profile input
-        # ----------------------------------------------
-
         sections = [
             {
-                "page_number": section.section_number,
+                "source_type": (
+                    "page"
+                    if document.file_type == "pdf"
+                    else "section"
+                ),
+                "source_number": section.section_number,
                 "text": section.text,
             }
             for section in document.sections
         ]
-
-        # ----------------------------------------------
-        # 3. Extract SystemProfile + evidence
-        # ----------------------------------------------
 
         extraction = (
             self.profile_service.extract_profile(
@@ -66,28 +59,16 @@ class CompliancePipelineService:
             )
         )
 
-        # ----------------------------------------------
-        # 4. Run compliance analysis
-        # ----------------------------------------------
-
         analysis = self.analysis_service.analyze(
             db=db,
             profile=extraction.profile,
             user_evidence=extraction.evidence,
         )
 
-        # ----------------------------------------------
-        # 5. Generate final report
-        # ----------------------------------------------
-
         report = self.report_service.generate_report(
             profile=extraction.profile,
             analysis=analysis,
         )
-
-        # ----------------------------------------------
-        # 6. Persist completed analysis
-        # ----------------------------------------------
 
         saved_analysis = AnalysisRepository.save(
             db=db,
@@ -99,10 +80,6 @@ class CompliancePipelineService:
             profile=extraction.profile,
             report=report,
         )
-
-        # ----------------------------------------------
-        # 7. Return result
-        # ----------------------------------------------
 
         return {
             "analysis_id": saved_analysis.analysis_id,

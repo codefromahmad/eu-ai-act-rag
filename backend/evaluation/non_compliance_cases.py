@@ -42,7 +42,8 @@ NON_COMPLIANCE_CASES = [
             ProfileEvidence(
                 field="logging",
                 value="Logging is disabled",
-                page_number=12,
+                source_type="page",
+                source_number=12,
                 quote=(
                     "The system does not automatically "
                     "generate or retain logs of predictions, "
@@ -84,7 +85,8 @@ NON_COMPLIANCE_CASES = [
             ProfileEvidence(
                 field="human_oversight",
                 value="No human override",
-                page_number=13,
+                source_type="page",
+                source_number=13,
                 quote=(
                     "Candidate rejection decisions are "
                     "performed automatically and HR staff "
@@ -111,7 +113,8 @@ NON_COMPLIANCE_CASES = [
             ProfileEvidence(
                 field="security",
                 value="No cybersecurity controls",
-                page_number=14,
+                source_type="page",
+                source_number=14,
                 quote=(
                     "The system has not undergone robustness "
                     "or cybersecurity testing and currently "

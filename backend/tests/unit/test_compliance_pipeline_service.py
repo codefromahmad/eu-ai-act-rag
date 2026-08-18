@@ -57,7 +57,8 @@ def test_pipeline_orchestrates_services():
             ProfileEvidence(
                 field="human_oversight",
                 value="Human review",
-                page_number=1,
+                source_type="page",
+                source_number=1,
                 quote="HR reviews recommendations.",
             )
         ]

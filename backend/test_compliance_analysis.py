@@ -49,7 +49,8 @@ try:
         ProfileEvidence(
             field="human_oversight",
             value="HR review before final decisions",
-            page_number=4,
+            source_type="page",
+            source_number=4,
             quote=(
                 "HR staff review the generated recommendations "
                 "before making the final hiring decision."

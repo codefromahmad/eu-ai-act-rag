@@ -10,7 +10,8 @@ def test_selects_human_oversight_evidence():
         ProfileEvidence(
             field="human_oversight",
             value="Human review",
-            page_number=4,
+            source_type="page",
+            source_number=4,
             quote=(
                 "HR staff review recommendations "
                 "before final decisions."
@@ -19,7 +20,8 @@ def test_selects_human_oversight_evidence():
         ProfileEvidence(
             field="training_data",
             value="Candidate dataset",
-            page_number=5,
+            source_type="page",
+            source_number=5,
             quote="Training data is collected from applicants.",
         ),
     ]
@@ -41,7 +43,8 @@ def test_returns_empty_list_when_no_relevant_evidence():
         ProfileEvidence(
             field="human_oversight",
             value="Human review",
-            page_number=4,
+            source_type="page",
+            source_number=4,
             quote="HR staff review recommendations.",
         ),
     ]

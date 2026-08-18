@@ -5,6 +5,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models.analysis_result import AnalysisScore
+from app.models.evidence import ProfileEvidence
 from app.models.report import (
     ComplianceReport,
     ReportSummary,
@@ -161,6 +162,14 @@ def test_report_endpoint_with_mocked_pipeline():
         ),
     )
 
+    evidence = ProfileEvidence(
+        field="human_oversight",
+        value="Human review",
+        source_type="section",
+        source_number=11,
+        quote="HR staff review recommendations.",
+    )
+
     mock_result = {
         "analysis_id": "mock-analysis-id",
         "filename": "system.txt",
@@ -168,7 +177,9 @@ def test_report_endpoint_with_mocked_pipeline():
         "page_count": None,
         "section_count": 1,
         "system_profile": profile,
-        "user_evidence": [],
+        "user_evidence": [
+            evidence
+        ],
         "report": report,
     }
 
@@ -211,6 +222,22 @@ def test_report_endpoint_with_mocked_pipeline():
 
     assert data["filename"] == "system.txt"
     assert data["file_type"] == "txt"
+
+    # Verify generic evidence source location.
+    assert (
+        data["user_evidence"][0]["source_type"]
+        == "section"
+    )
+
+    assert (
+        data["user_evidence"][0]["source_number"]
+        == 11
+    )
+
+    assert (
+        data["user_evidence"][0]["field"]
+        == "human_oversight"
+    )
 
     assert (
         data["report"]["score"]

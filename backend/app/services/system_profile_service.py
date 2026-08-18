@@ -31,20 +31,51 @@ Rules:
 5. Add important missing information to unknown_information.
 6. Keep descriptions concise.
 7. Every important extracted fact should have evidence.
-8. Evidence must contain the page number where it was found.
-9. The quote must come from the provided document.
-10. Return only valid JSON.
+8. Evidence must identify where the information was found.
+9. Use source_type and source_number for evidence location.
+10. source_type must be either "page" or "section".
+11. source_number must match the supplied document location.
+12. The quote must come from the provided document.
+13. Return only valid JSON.
 """
+
+        document_parts: list[str] = []
+
+        for source in pages:
+
+            source_type = source.get(
+                "source_type",
+                "page",
+            )
+
+            source_number = source.get(
+                "source_number",
+                source.get(
+                    "page_number"
+                ),
+            )
+
+            label = (
+                "PAGE"
+                if source_type == "page"
+                else "SECTION"
+            )
+
+            document_parts.append(
+                f"""
+--- {label} {source_number} ---
+{source["text"]}
+"""
+            )
 
         document = "\n\n".join(
-            f"""
---- PAGE {page["page_number"]} ---
-{page["text"]}
-"""
-            for page in pages
+            document_parts
         )
 
-        schema = SystemProfileExtraction.model_json_schema()
+        schema = (
+            SystemProfileExtraction
+            .model_json_schema()
+        )
 
         user_prompt = f"""
 Extract a structured AI system profile from this document.
@@ -61,8 +92,12 @@ The SystemProfile field being supported.
 value:
 The extracted value.
 
-page_number:
-The PDF page containing the evidence.
+source_type:
+Use "page" for PDF pages.
+Use "section" for DOCX, TXT, Markdown, or other section-based documents.
+
+source_number:
+The page or section number containing the evidence.
 
 quote:
 A short exact passage supporting the extracted information.
@@ -77,6 +112,13 @@ DOCUMENT:
             user_prompt=user_prompt,
         )
 
-        data = json.loads(raw_response)
+        data = json.loads(
+            raw_response
+        )
 
-        return SystemProfileExtraction.model_validate(data)
+        return (
+            SystemProfileExtraction
+            .model_validate(
+                data
+            )
+        )
