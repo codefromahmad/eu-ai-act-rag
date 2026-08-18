@@ -1,0 +1,5 @@
+This AI system ranks job candidates.
+
+HR staff review the recommendations before making final decisions.
+
+The system processes personal data.

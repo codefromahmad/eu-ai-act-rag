@@ -1,7 +1,15 @@
 from pathlib import Path
 
+import pytest
+
 from app.services.document_extraction_service import (
     DocumentExtractionService,
+)
+
+
+FIXTURES_DIR = (
+    Path(__file__).resolve().parents[1]
+    / "fixtures"
 )
 
 
@@ -10,7 +18,10 @@ def test_extract_txt_document():
     service = DocumentExtractionService()
 
     document = service.extract(
-        "data/test_system.txt"
+        str(
+            FIXTURES_DIR
+            / "test_system.txt"
+        )
     )
 
     assert document.file_type == "txt"
@@ -25,7 +36,10 @@ def test_extract_markdown_document():
     service = DocumentExtractionService()
 
     document = service.extract(
-        "data/test_system.md"
+        str(
+            FIXTURES_DIR
+            / "test_system.md"
+        )
     )
 
     assert document.file_type == "md"
@@ -38,7 +52,10 @@ def test_extract_docx_document():
     service = DocumentExtractionService()
 
     document = service.extract(
-        "data/test_system01.docx"
+        str(
+            FIXTURES_DIR
+            / "test_system01.docx"
+        )
     )
 
     assert document.file_type == "docx"
@@ -46,9 +63,14 @@ def test_extract_docx_document():
     assert document.page_count is None
 
 
-def test_unsupported_document_is_rejected(tmp_path):
+def test_unsupported_document_is_rejected(
+    tmp_path,
+):
 
-    file_path = tmp_path / "test.jpg"
+    file_path = (
+        tmp_path
+        / "test.jpg"
+    )
 
     file_path.write_bytes(
         b"fake image content"
@@ -56,14 +78,10 @@ def test_unsupported_document_is_rejected(tmp_path):
 
     service = DocumentExtractionService()
 
-    try:
+    with pytest.raises(
+        ValueError,
+        match="Unsupported file type",
+    ):
         service.extract(
             str(file_path)
         )
-
-        assert False, (
-            "Expected unsupported file type error."
-        )
-
-    except ValueError as exc:
-        assert "Unsupported file type" in str(exc)
