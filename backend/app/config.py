@@ -17,6 +17,8 @@ class Settings(BaseSettings):
 
     cors_origins: str = "http://localhost:5173"
 
+    embedding_backend: str = "torch"
+
     @property
     def allowed_origins(self) -> list[str]:
         return [
@@ -34,8 +36,6 @@ class Settings(BaseSettings):
         cls,
         value: str,
     ) -> str:
-        # Some cloud providers return postgres://
-        # while SQLAlchemy expects postgresql://.
         if value.startswith("postgres://"):
             return value.replace(
                 "postgres://",
