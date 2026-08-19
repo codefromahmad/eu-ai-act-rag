@@ -523,25 +523,31 @@ Future production systems would require additional legal review, security harden
 
 ---
 
-## Screenshots
+## Application Screenshots
 
-Screenshots of the application interface will be added here.
+### Analyze an AI System
 
-### Document Analysis
+Upload AI system documentation and start an evidence-grounded EU AI Act compliance assessment.
 
-<!-- screenshot -->
+![Document Analysis](docs/screenshots/home.png)
 
 ### Compliance Report
 
-<!-- screenshot -->
+The generated report presents the system's risk classification, compliance score, evidence coverage, strengths, weaknesses, missing information, and recommendations.
 
-### Requirement & Legal Evidence
+![Compliance Report](docs/screenshots/report.png)
 
-<!-- screenshot -->
+### Requirement-Level Assessment
+
+Each applicable requirement is assessed independently using evidence from the uploaded documentation and retrieved EU AI Act provisions. Legal references can be expanded for traceability.
+
+![Requirement and Legal Evidence](docs/screenshots/legal-reference.png)
 
 ### Analysis History
 
-<!-- screenshot -->
+Completed analyses are persisted in PostgreSQL and can be reopened without running the LLM pipeline again.
+
+![Analysis History](docs/screenshots/history.png)
 
 ---
 
