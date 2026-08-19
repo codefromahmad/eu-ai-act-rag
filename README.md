@@ -1,8 +1,15 @@
 # EU AI Act Compliance Analyzer
 
-An evidence-grounded RAG system for analyzing AI system documentation against relevant requirements of the **EU AI Act**.
+> An evidence-grounded RAG system for analyzing AI system documentation against relevant requirements of the **EU AI Act**.
 
-The application accepts technical documentation describing an AI system, extracts a structured system profile, determines the applicable AI Act risk category, retrieves relevant legal provisions, evaluates available evidence against compliance requirements, and generates an explainable compliance assessment.
+The application accepts technical documentation describing an AI system, extracts a structured system profile, determines the applicable AI Act risk category, retrieves relevant legal provisions, evaluates available evidence against individual requirements, and generates an explainable compliance assessment.
+
+![Python](https://img.shields.io/badge/Python-3.11-blue)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688)
+![React](https://img.shields.io/badge/React-Frontend-61DAFB)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-pgvector-4169E1)
+![Tests](https://img.shields.io/badge/tests-23%20passed-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-green)
 
 > **Disclaimer:** This project is an AI-assisted compliance assessment and decision-support tool. It does not provide legal advice or constitute a formal determination of EU AI Act compliance.
 
@@ -12,9 +19,9 @@ The application accepts technical documentation describing an AI system, extract
 
 Organizations developing or deploying AI systems may need to understand which EU AI Act obligations apply to their systems and whether their existing documentation provides sufficient evidence of compliance.
 
-This project explores how **Retrieval-Augmented Generation (RAG), structured information extraction, semantic retrieval, and LLM-based reasoning** can support that process.
+This project explores how **Retrieval-Augmented Generation (RAG), structured information extraction, semantic retrieval, vector search, and LLM-based reasoning** can support that process.
 
-Instead of asking an LLM to evaluate a document against the entire regulation directly, the system uses a structured pipeline:
+Instead of asking an LLM to evaluate an entire document against the entire regulation in a single prompt, the application uses a structured, evidence-grounded pipeline.
 
 1. Validate and extract the uploaded document.
 2. Convert the document into a structured AI system profile.
@@ -51,89 +58,25 @@ Instead of asking an LLM to evaluate a document against the entire regulation di
 - REST API built with FastAPI
 - Modern React dashboard for report visualization
 - Automated unit and integration testing
+- Health and readiness endpoints
+- LLM quota/error handling
 - CI-ready project structure
 
 ---
 
 ## System Architecture
 
-```text
-                         ┌──────────────────────────┐
-                         │       React Client       │
-                         │    React + Tailwind CSS  │
-                         └────────────┬─────────────┘
-                                      │
-                                      │ REST API
-                                      ▼
-                         ┌──────────────────────────┐
-                         │        FastAPI API       │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │   Document Validation    │
-                         │ PDF / DOCX / TXT / MD    │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │  Document Extraction     │
-                         │ pages / sections / text  │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │ System Profile + Evidence│
-                         │          LLM             │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │    Risk Classification   │
-                         └────────────┬─────────────┘
-                                      │
-                         ┌────────────┴─────────────┐
-                         │                          │
-                         ▼                          ▼
-              ┌────────────────────┐    ┌─────────────────────┐
-              │ Requirement        │    │ EU AI Act Retrieval │
-              │ Registry           │    │ Articles / Annexes  │
-              └─────────┬──────────┘    └──────────┬──────────┘
-                        │                          │
-                        └────────────┬─────────────┘
-                                     ▼
-                         ┌──────────────────────────┐
-                         │   Evidence Selection     │
-                         │ requirement ↔ evidence   │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │ Compliance Assessment    │
-                         │ compliant / partial /    │
-                         │ non-compliant / unknown  │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │ Scoring + Report         │
-                         │ compliance + coverage    │
-                         └────────────┬─────────────┘
-                                      │
-                                      ▼
-                         ┌──────────────────────────┐
-                         │ PostgreSQL + pgvector    │
-                         │ analyses + legal corpus  │
-                         └──────────────────────────┘
-```
+![EU AI Act Compliance Analyzer Architecture](docs/architecture.png)
+
+The architecture separates document understanding, legal retrieval, evidence selection, compliance reasoning, scoring, and persistence instead of relying on a single unrestricted LLM prompt.
 
 ---
 
 ## Why Evidence Grounding?
 
-A major design goal of the project is to avoid treating an LLM response as sufficient evidence.
+A major design goal of the project is to avoid treating an LLM response itself as sufficient evidence.
 
-The pipeline therefore distinguishes between two types of evidence.
+The pipeline distinguishes between two types of evidence.
 
 ### User Evidence
 
@@ -145,9 +88,11 @@ Example:
 HR staff review AI-generated recommendations and can override rankings.
 ```
 
+User evidence retains its source location so that generated assessments can be traced back to the uploaded documentation.
+
 ### Legal Evidence
 
-Relevant provisions retrieved from the EU AI Act knowledge base.
+Relevant provisions retrieved from the indexed EU AI Act knowledge base.
 
 Example:
 
@@ -155,9 +100,9 @@ Example:
 Article 14 — Human Oversight
 ```
 
-The compliance analyzer evaluates the relevant user evidence against the corresponding legal requirement instead of comparing every document statement against every Article.
+The compliance analyzer evaluates relevant user evidence against the corresponding legal requirement instead of comparing every document statement against every provision.
 
-This reduces unnecessary LLM calls and makes assessments more traceable.
+This reduces unnecessary LLM calls, improves traceability, and keeps individual assessments focused on the relevant requirement.
 
 ---
 
@@ -174,13 +119,13 @@ Applicable requirements are evaluated independently.
 
 `Unknown` is intentionally different from `Non-compliant`.
 
-Missing documentation should not automatically be interpreted as proof that a system violates a legal requirement.
+Missing documentation should not automatically be interpreted as proof that an AI system violates a legal requirement.
 
 ---
 
 ## Compliance Score vs Evidence Coverage
 
-The project separates two concepts that are often incorrectly combined.
+The project deliberately separates two different concepts.
 
 ### Compliance Score
 
@@ -197,9 +142,9 @@ Compliance Score: 50%
 Evidence Coverage: 14.29%
 ```
 
-A moderate compliance score with very low coverage should therefore **not** be interpreted as strong overall compliance.
+A moderate compliance score with very low evidence coverage should **not** be interpreted as strong overall compliance.
 
-This distinction makes uncertainty visible to the user.
+This distinction prevents missing information from being hidden behind a seemingly positive score and makes uncertainty visible to the user.
 
 ---
 
@@ -213,7 +158,7 @@ Consider an AI recruitment system that:
 - provides recommendations to HR staff
 - allows HR staff to override AI recommendations
 
-The pipeline can identify recruitment as a potentially **high-risk AI use case**, retrieve the relevant EU AI Act requirements, and evaluate whether the uploaded documentation contains evidence for areas such as:
+The pipeline can identify recruitment as a potentially **high-risk AI use case**, retrieve relevant EU AI Act requirements, and evaluate whether the uploaded documentation contains sufficient evidence for areas such as:
 
 - risk management
 - data governance
@@ -221,9 +166,10 @@ The pipeline can identify recruitment as a potentially **high-risk AI use case**
 - record keeping
 - transparency
 - human oversight
-- accuracy, robustness, and cybersecurity
+- accuracy and robustness
+- cybersecurity
 
-The resulting report highlights strengths, weaknesses, missing information, and recommended actions.
+The resulting report highlights strengths, weaknesses, missing information, requirement-level findings, legal references, and recommended actions.
 
 ---
 
@@ -279,12 +225,14 @@ eu-ai-act-rag/
 │   │   └── services/
 │   │
 │   ├── evaluation/
+│   ├── scripts/
 │   ├── tests/
 │   │   ├── integration/
 │   │   └── unit/
 │   │
 │   ├── ARCHITECTURE.md
 │   ├── README.md
+│   ├── requirements.txt
 │   └── .env.example
 │
 ├── frontend/
@@ -294,6 +242,15 @@ eu-ai-act-rag/
 │       ├── pages/
 │       └── services/
 │
+├── docs/
+│   ├── architecture.png
+│   └── screenshots/
+│       ├── home.png
+│       ├── report.png
+│       ├── legal-reference.png
+│       └── history.png
+│
+├── LICENSE
 └── README.md
 ```
 
@@ -330,6 +287,34 @@ Report Generation
        ↓
 PostgreSQL Persistence
 ```
+
+### Pipeline Design
+
+The pipeline deliberately separates responsibilities:
+
+**Document Extraction**  
+Converts PDF, DOCX, Markdown, and text documents into a normalized internal representation.
+
+**System Profile Extraction**  
+Uses the LLM to convert unstructured AI system documentation into structured system information.
+
+**Risk Classification**  
+Determines the relevant EU AI Act risk category using the extracted system profile and legal context.
+
+**Legal Retrieval**  
+Retrieves relevant EU AI Act Articles and Annexes from the indexed legal knowledge base.
+
+**Evidence Selection**  
+Selects only user evidence relevant to a particular compliance requirement.
+
+**Compliance Analysis**  
+Evaluates each requirement using its corresponding user and legal evidence.
+
+**Scoring**  
+Separates compliance performance from evidence coverage.
+
+**Persistence**  
+Stores completed analyses in PostgreSQL so they can be retrieved without rerunning the complete LLM pipeline.
 
 ---
 
@@ -379,11 +364,17 @@ GET /api/health
 GET /api/ready
 ```
 
+When running locally, interactive FastAPI documentation is available at:
+
+```text
+http://localhost:8000/docs
+```
+
 ---
 
 ## Local Development
 
-### 1. Clone
+### 1. Clone the Repository
 
 ```bash
 git clone https://github.com/codefromahmad/eu-ai-act-rag.git
@@ -409,13 +400,13 @@ cp .env.example .env
 
 Configure the required database and LLM credentials in `.env`.
 
-Start the backend:
+Initialize the database as required by the backend setup, then start the API:
 
 ```bash
 python -m uvicorn app.main:app --reload
 ```
 
-The FastAPI server runs locally on:
+The FastAPI server runs locally at:
 
 ```text
 http://localhost:8000
@@ -429,7 +420,7 @@ http://localhost:8000/docs
 
 ### 3. Frontend
 
-Open another terminal:
+Open another terminal from the repository root:
 
 ```bash
 cd frontend
@@ -437,7 +428,7 @@ npm install
 npm run dev
 ```
 
-The Vite development server runs locally on:
+The Vite development server runs locally at:
 
 ```text
 http://localhost:5173
@@ -447,7 +438,7 @@ http://localhost:5173
 
 ## Testing
 
-The backend includes unit and integration tests covering major parts of the application.
+The backend contains unit and integration tests covering the main application behavior.
 
 Run:
 
@@ -463,7 +454,7 @@ Current test suite:
 23 passed
 ```
 
-Coverage includes:
+Tests cover:
 
 - document validation
 - document extraction
@@ -473,7 +464,7 @@ Coverage includes:
 - pipeline orchestration
 - document API behavior
 - analysis persistence API
-- health/readiness endpoints
+- health and readiness endpoints
 - API error handling
 - LLM quota exhaustion handling
 
@@ -481,12 +472,18 @@ Coverage includes:
 
 ## Frontend Production Build
 
+Create an optimized frontend build with:
+
 ```bash
 cd frontend
 npm run build
 ```
 
-The frontend is production-buildable using Vite.
+The resulting Vite production bundle is generated under:
+
+```text
+frontend/dist/
+```
 
 ---
 
@@ -495,31 +492,14 @@ The frontend is production-buildable using Vite.
 The project intentionally includes several safeguards:
 
 - missing information is represented explicitly
-- unsupported evidence is not fabricated
+- unsupported evidence should not be fabricated
 - user evidence retains source references
 - legal evidence remains traceable to EU AI Act provisions
 - requirements are evaluated independently
 - evidence coverage is separated from compliance score
 - external LLM quota failures are handled by the API
 - file type and size validation occur before analysis
-
----
-
-## Limitations
-
-This is a portfolio and research-oriented implementation rather than a certified legal compliance product.
-
-Current limitations include:
-
-- LLM outputs can still contain reasoning errors
-- retrieval quality depends on the indexed legal corpus
-- compliance interpretation can require legal expertise
-- uploaded documentation may omit important operational information
-- a high compliance score with low evidence coverage should not be treated as proof of compliance
-- regulatory guidance and interpretation may evolve
-- external LLM services introduce availability and quota dependencies
-
-Future production systems would require additional legal review, security hardening, privacy controls, evaluation, auditability, and regulatory-change management.
+- completed analyses can be retrieved without rerunning the LLM pipeline
 
 ---
 
@@ -539,7 +519,9 @@ The generated report presents the system's risk classification, compliance score
 
 ### Requirement-Level Assessment
 
-Each applicable requirement is assessed independently using evidence from the uploaded documentation and retrieved EU AI Act provisions. Legal references can be expanded for traceability.
+Each applicable requirement is assessed independently using evidence from the uploaded documentation and retrieved EU AI Act provisions.
+
+Legal references can be expanded to inspect the underlying EU AI Act text used by the assessment.
 
 ![Requirement and Legal Evidence](docs/screenshots/legal-reference.png)
 
@@ -548,6 +530,24 @@ Each applicable requirement is assessed independently using evidence from the up
 Completed analyses are persisted in PostgreSQL and can be reopened without running the LLM pipeline again.
 
 ![Analysis History](docs/screenshots/history.png)
+
+---
+
+## Limitations
+
+This is a portfolio and research-oriented implementation rather than a certified legal compliance product.
+
+Current limitations include:
+
+- LLM outputs can still contain reasoning errors
+- retrieval quality depends on the indexed legal corpus
+- compliance interpretation can require legal expertise
+- uploaded documentation may omit important operational information
+- a high compliance score with low evidence coverage should not be treated as proof of compliance
+- regulatory guidance and interpretation may evolve
+- external LLM services introduce availability and quota dependencies
+
+A production compliance system would require additional legal review, security hardening, privacy controls, evaluation, auditability, monitoring, and regulatory-change management.
 
 ---
 
@@ -569,11 +569,31 @@ Potential extensions include:
 
 ---
 
+## What This Project Demonstrates
+
+This project demonstrates practical experience with:
+
+- designing an end-to-end RAG architecture
+- building LLM-backed backend services
+- structured extraction from unstructured documents
+- semantic and vector retrieval
+- evidence-grounded LLM reasoning
+- prompt and schema design
+- FastAPI API development
+- PostgreSQL and pgvector
+- React frontend development
+- AI system evaluation
+- automated unit and integration testing
+- error handling for external AI services
+- translating regulatory documents into machine-assisted analysis workflows
+
+---
+
 ## Author
 
 **Aafaq Ahmad**
 
-Software Engineering / NLP / AI Engineering
+Software Engineering · Natural Language Processing · AI Engineering
 
 GitHub: `@codefromahmad`
 
@@ -581,7 +601,7 @@ GitHub: `@codefromahmad`
 
 ## License
 
-This project is licensed under the MIT License.
+This project is licensed under the [MIT License](LICENSE).
 
 ---
 
