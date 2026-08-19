@@ -1,3 +1,6 @@
+import logging
+import time
+
 from sqlalchemy.orm import Session
 
 from app.repositories.analysis_repository import (
@@ -9,6 +12,9 @@ from app.services.document_extraction_service import (
 from app.services.full_analysis_service import FullAnalysisService
 from app.services.report_service import ReportService
 from app.services.system_profile_service import SystemProfileService
+
+
+logger = logging.getLogger(__name__)
 
 
 class CompliancePipelineService:
@@ -29,10 +35,25 @@ class CompliancePipelineService:
         original_filename: str | None = None,
     ) -> dict:
 
+        pipeline_start = time.perf_counter()
+
+        logger.info("[REPORT] Pipeline started")
+
+        # --------------------------------------------------
+        # 1. Document extraction
+        # --------------------------------------------------
+
+        stage_start = time.perf_counter()
+
         document = (
             self.document_extraction_service.extract(
                 file_path=file_path
             )
+        )
+
+        logger.info(
+            "[REPORT] Document extraction complete in %.2fs",
+            time.perf_counter() - stage_start,
         )
 
         if not document.text.strip():
@@ -53,11 +74,32 @@ class CompliancePipelineService:
             for section in document.sections
         ]
 
+        # --------------------------------------------------
+        # 2. System profile extraction
+        # --------------------------------------------------
+
+        logger.info("[REPORT] Starting system profile extraction")
+
+        stage_start = time.perf_counter()
+
         extraction = (
             self.profile_service.extract_profile(
                 pages=sections
             )
         )
+
+        logger.info(
+            "[REPORT] System profile extraction complete in %.2fs",
+            time.perf_counter() - stage_start,
+        )
+
+        # --------------------------------------------------
+        # 3. Compliance analysis
+        # --------------------------------------------------
+
+        logger.info("[REPORT] Starting compliance analysis")
+
+        stage_start = time.perf_counter()
 
         analysis = self.analysis_service.analyze(
             db=db,
@@ -65,10 +107,36 @@ class CompliancePipelineService:
             user_evidence=extraction.evidence,
         )
 
+        logger.info(
+            "[REPORT] Compliance analysis complete in %.2fs",
+            time.perf_counter() - stage_start,
+        )
+
+        # --------------------------------------------------
+        # 4. Report generation
+        # --------------------------------------------------
+
+        logger.info("[REPORT] Starting report generation")
+
+        stage_start = time.perf_counter()
+
         report = self.report_service.generate_report(
             profile=extraction.profile,
             analysis=analysis,
         )
+
+        logger.info(
+            "[REPORT] Report generation complete in %.2fs",
+            time.perf_counter() - stage_start,
+        )
+
+        # --------------------------------------------------
+        # 5. Persistence
+        # --------------------------------------------------
+
+        logger.info("[REPORT] Starting database save")
+
+        stage_start = time.perf_counter()
 
         saved_analysis = AnalysisRepository.save(
             db=db,
@@ -79,6 +147,16 @@ class CompliancePipelineService:
             file_type=document.file_type,
             profile=extraction.profile,
             report=report,
+        )
+
+        logger.info(
+            "[REPORT] Database save complete in %.2fs",
+            time.perf_counter() - stage_start,
+        )
+
+        logger.info(
+            "[REPORT] Pipeline complete in %.2fs",
+            time.perf_counter() - pipeline_start,
         )
 
         return {
