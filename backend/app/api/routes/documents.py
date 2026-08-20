@@ -3,6 +3,7 @@ from pathlib import Path
 from tempfile import NamedTemporaryFile
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from starlette.concurrency import run_in_threadpool
 
 from app.db.database import SessionLocal
 from app.exceptions.llm_exceptions import (
@@ -105,7 +106,7 @@ def save_upload_to_temp(
 
 @router.post("/extract")
 async def extract_document(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
 
     extension = file_validation_service.validate(
@@ -128,8 +129,9 @@ async def extract_document(
             DocumentExtractionService()
         )
 
-        document = extraction_service.extract(
-            file_path=temp_path
+        document = await run_in_threadpool(
+            extraction_service.extract,
+            temp_path,
         )
 
         if not document.text.strip():
@@ -183,7 +185,7 @@ async def extract_document(
 
 @router.post("/analyze")
 async def analyze_document(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
 
     extension = file_validation_service.validate(
@@ -206,8 +208,9 @@ async def analyze_document(
             DocumentExtractionService()
         )
 
-        document = extraction_service.extract(
-            file_path=temp_path
+        document = await run_in_threadpool(
+            extraction_service.extract,
+            temp_path,
         )
 
         if not document.text.strip():
@@ -233,10 +236,9 @@ async def analyze_document(
             SystemProfileService()
         )
 
-        extraction = (
-            profile_service.extract_profile(
-                pages=sections
-            )
+        extraction = await run_in_threadpool(
+            profile_service.extract_profile,
+            sections,
         )
 
         return {
@@ -296,7 +298,7 @@ async def analyze_document(
 
 @router.post("/report")
 async def generate_compliance_report(
-    file: UploadFile = File(...)
+    file: UploadFile = File(...),
 ):
 
     extension = file_validation_service.validate(
@@ -322,12 +324,11 @@ async def generate_compliance_report(
             CompliancePipelineService()
         )
 
-        result = (
-            pipeline.analyze_document(
-                db=db,
-                file_path=temp_path,
-                original_filename=file.filename,
-            )
+        result = await run_in_threadpool(
+            pipeline.analyze_document,
+            db,
+            temp_path,
+            file.filename,
         )
 
         return {
