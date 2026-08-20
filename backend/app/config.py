@@ -9,14 +9,18 @@ class Settings(BaseSettings):
     debug: bool = False
     environment: str = "development"
 
-    groq_api_key: str
-    groq_base_url: str = "https://api.groq.com/openai/v1"
-    groq_model: str
+    # LLM configuration
+    llm_api_key: str
+    llm_base_url: str
+    llm_model: str
 
+    # Database
     database_url: str
 
+    # CORS
     cors_origins: str = "http://localhost:5173"
 
+    # Embeddings
     embedding_backend: str = "torch"
 
     @property

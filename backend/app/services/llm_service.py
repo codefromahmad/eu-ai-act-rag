@@ -2,6 +2,8 @@ import time
 
 from openai import (
     APIError,
+    APITimeoutError,
+    APIStatusError,
     OpenAI,
     RateLimitError,
 )
@@ -19,24 +21,25 @@ class LLMService:
 
     def __init__(self):
         self.client = OpenAI(
-            api_key=settings.groq_api_key,
-            base_url=settings.groq_base_url,
+            api_key=settings.llm_api_key,
+            base_url=settings.llm_base_url,
+            timeout=60.0,
+            max_retries=0,
         )
 
-        self.model = settings.groq_model
+        self.model = settings.llm_model
 
     def generate_json(
         self,
         system_prompt: str,
         user_prompt: str,
-        max_retries: int = 5,
+        max_retries: int = 3,
     ) -> str:
 
         for attempt in range(
             1,
             max_retries + 1,
         ):
-
             try:
                 response = (
                     self.client
@@ -76,38 +79,66 @@ class LLMService:
                 return content
 
             except RateLimitError as exc:
-
-                message = str(exc).lower()
-
-                # Daily quota / tokens-per-day exhausted.
-                # Waiting a few seconds will not solve this.
-                if (
-                    "tokens per day" in message
-                    or "tpd" in message
-                ):
-                    raise LLMQuotaExceededError(
-                        "The LLM provider daily quota "
-                        "has been exhausted."
-                    ) from exc
-
-                # Short-term rate limit.
                 if attempt == max_retries:
                     raise LLMRateLimitError(
                         "The LLM provider rate limit "
                         "was exceeded after multiple retries."
                     ) from exc
 
-                wait_seconds = 3 * attempt
+                wait_seconds = 2 * attempt
 
                 print(
-                    "Groq rate limit reached. "
+                    "LLM rate limit reached. "
                     f"Waiting {wait_seconds} seconds "
                     f"before retry {attempt}/{max_retries}..."
                 )
 
-                time.sleep(
-                    wait_seconds
+                time.sleep(wait_seconds)
+
+            except APITimeoutError as exc:
+                if attempt == max_retries:
+                    raise LLMServiceError(
+                        "The LLM request timed out."
+                    ) from exc
+
+                wait_seconds = 2 * attempt
+
+                print(
+                    "LLM request timed out. "
+                    f"Waiting {wait_seconds} seconds "
+                    f"before retry {attempt}/{max_retries}..."
                 )
+
+                time.sleep(wait_seconds)
+
+            except APIStatusError as exc:
+                status_code = exc.status_code
+
+                if status_code == 402:
+                    raise LLMQuotaExceededError(
+                        "The LLM account has insufficient credits."
+                    ) from exc
+
+                if status_code == 429:
+                    raise LLMRateLimitError(
+                        "The LLM provider rate limit was exceeded."
+                    ) from exc
+
+                if status_code in (
+                    502,
+                    503,
+                    524,
+                    529,
+                ):
+                    raise LLMServiceError(
+                        "The selected LLM provider "
+                        "is temporarily unavailable."
+                    ) from exc
+
+                raise LLMServiceError(
+                    "The LLM provider returned "
+                    f"HTTP {status_code}."
+                ) from exc
 
             except APIError as exc:
                 raise LLMServiceError(
